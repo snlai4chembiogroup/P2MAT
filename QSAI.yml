@@ -1,0 +1,43 @@
+name: qsai
+channels:
+  - apple
+  - conda-forge
+dependencies:
+    - python=3.12.*
+    - pip>=23
+    - jupyter
+    - scikit-learn
+    - scipy
+    - numpy
+    - pandas
+    - pandas-datareader
+    - statsmodels
+    - matplotlib
+    - pillow
+    - tqdm
+    - shap
+    - seaborn
+    - requests
+    - altair
+    - xgboost
+    - h5py
+    - pyyaml
+    - flask
+    - boto3
+    - openpyxl
+    - rdkit
+    - cairosvg
+    - cirpy
+    - thermo
+    - pubchempy
+    - chart-studio
+    - ipykernel
+    - biopython
+    - pip:
+        - bayesian-optimization
+        - gym
+        - kaggle
+        - PyQt5
+        - pyinstaller
+        - padelpy
+        - kneed
