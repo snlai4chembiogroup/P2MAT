@@ -1,0 +1,9 @@
+{
+  "properties": {
+    "MP": true,
+    "BP": false,
+    "HC": false,
+    "dH": false,
+    "h2_uptake": false
+  }
+}
