@@ -9,21 +9,17 @@ from __future__ import print_function
 
 # Import packages
 import numpy as np
+import pandas as pd
 import time
 import sys
 from utils.mspp import MaterialStructuralPropertyPrediction
 from utils import helper
 
 import os
-PKGDIR = os.getcwd()
-
-#from . import PKGDIR
-#import os
-from sys import platform
 
 # UI related libraries
 from PyQt5.Qt import Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -58,6 +54,9 @@ class MatPropPred(QWidget):
         
         self.setWindowTitle("Material property prediction")
         self.resize(width, height)
+        # Set the application icon
+        # Replace 'icon.png' with the actual name/path of your icon file
+        self.setWindowIcon(QIcon('icon.png'))
         self.__create_UI__()
         self.popup = None
         self.batch = batch_size
@@ -127,48 +126,60 @@ class MatPropPred(QWidget):
         #self.__show_popup__()
 
         txt = self.__get_smiles__()
-        print(txt)
+        #print(txt)
 
         if len(''.join(txt))>0:
+            self.pbar.setMaximum(len(txt))
             self.resize(self.width, self.height+100)
             self.pbar.setHidden(False)
             time.sleep(0.05)
             print('Starting loop')
+            wrong_smiles = []
+            self.prop_data = None
             
-            for i in range(101): 
+            for i, smile in enumerate(txt):
                 time.sleep(0.05)
                 QApplication.processEvents() 
-                
-                if i==98:
-                    mspp = MaterialStructuralPropertyPrediction(pkg_dir=PKGDIR,verbose=self.verbose, batch=self.batch)
-                    self.prop_data = None
-                    wrong_smiles = []
-                    
-                    try:
-                        wrong_smiles = mspp.prediction_from_smile(txt)
+
+                try:
+                    mspp = MaterialStructuralPropertyPrediction(verbose=self.verbose, batch=self.batch)
+                    wrong_smile = mspp.prediction_from_smile([smile])
+                    if len(wrong_smile)>0:
+                        wrong_smiles.extend(wrong_smile)
+
+                    tmp_data = mspp.get_data()
+                    if tmp_data is None or len(tmp_data)==0:
+                        print(f"No data for smile: {smile}")
+                        continue
+
+                    if self.prop_data is None:
                         self.prop_data = mspp.get_data()
-                    except Exception as e:
-                        print(f'Error on prediction: {e}')
-                    finally:
-                        del[mspp]
-            
-                    if len(wrong_smiles)>0:
-                        self.result_lbl.setHidden(False)
-                        self.result_details_lbl.setHidden(False)
-                        self.result_details_lbl.appendPlainText("Following SMILEs are in wrong format:")
-                        for i,s in enumerate(wrong_smiles):
-                            self.result_details_lbl.appendPlainText(f"{i+1}) {s}")
-            
-                    if self.prop_data is not None and len(self.prop_data)>0:
-                        print(self.prop_data.shape)
-                        print(self.prop_data.columns)
-                        self.button2.setHidden(False)
-                        self.result_lbl.setHidden(False)
-                        self.resize(self.width, self.height+300)
-                        self.__create_prop_table__()
+                    else:
+                        self.prop_data = pd.concat([self.prop_data, mspp.get_data()], axis=0, ignore_index=True)
+
+                except Exception as e:
+                    print(f'Error on prediction: {e}')
+                finally:
+                    del[mspp]
+
+                self.pbar.setValue(i+1)
+        
+            if len(wrong_smiles)>0:
+                self.result_lbl.setHidden(False)
+                self.result_details_lbl.setHidden(False)
+                self.result_details_lbl.appendPlainText("Following SMILEs are in wrong format:")
+                for i,s in enumerate(wrong_smiles):
+                    self.result_details_lbl.appendPlainText(f"{i+1}) {s}")
+    
+            if self.prop_data is not None and len(self.prop_data)>0:
+                print(self.prop_data.shape)
+                print(self.prop_data.columns)
+                self.button2.setHidden(False)
+                self.result_lbl.setHidden(False)
+                self.resize(self.width, self.height+300)
+                self.__create_prop_table__()
       
-                # setting value to progress bar 
-                self.pbar.setValue(i)
+                
     
         #self.__close_popup__()
 
@@ -189,14 +200,16 @@ class MatPropPred(QWidget):
     def __create_UI__(self):
         # Create all app object
         logo_lbl = QLabel("")
-        pixmap = QPixmap(f"{PKGDIR}/design/snl-logo-inline.svg")
+        logo_path = helper.resource_path(os.path.join("design", "snl-logo-inline.svg"))
+        print(f"Logo path: {logo_path}")
+        pixmap = QPixmap(logo_path)
         logo_lbl.setPixmap(pixmap)
         logo_lbl.resize(pixmap.width(), pixmap.height())
         
         smile_lbl = QLabel("Enter a SMILE string\n(Multiple SMILEs in new line)")
         self.smile_txt = QTextEdit()
         
-        prop_lbl = QLabel("Select a property")
+        #prop_lbl = QLabel("Select a property")
         self.prop_choice = QComboBox()
         self.prop_choice.addItems(["Melting point"])
 
@@ -270,14 +283,12 @@ class MatPropPred(QWidget):
 
 if __name__=="__main__":
     app = QApplication(sys.argv)
-    
-    '''
-    qss="css/myapp.qss"
-    with open(qss,"r") as fh:
-        app.setStyleSheet(fh.read())
-    '''
+    app.setWindowIcon(QIcon('icon.png'))
 
-    stylesheet = helper.read_and_replace_css(f"{PKGDIR}/design/myapp.css", PKGDIR)
+    css_file = helper.resource_path(os.path.join("design", "myapp.css"))
+    print(f"CSS file path: {css_file}")
+
+    stylesheet = helper.read_and_replace_css(css_file)
     app.setStyleSheet(stylesheet)
     
     window = MatPropPred()

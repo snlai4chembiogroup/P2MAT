@@ -23,11 +23,9 @@ P2MAT is a GUI that enable user to input SMILEs strings of chemical compounds to
 
 ## Set up
 
-Note that for MacOS this software can be installed directly using the `P2MAT.dmg` (located at "https://drive.google.com/file/d/1-tgf9NRVIPSOwA9IB4no5OYle6rK9Kam/view?usp=sharing"). For this `Xcode` and, `java runtime environment` is required. Follow the steps below for the alternative method.
-
 ### Environment
 
-This python based software requires python `>=12.3`, `Xcode` and, `java runtime environment`. 
+This python based software requires python `>=12.3`
 
 #### Conda
 
@@ -35,22 +33,28 @@ A conda software requires to setup environments to run this software. Either [an
 
 ### SSH
 
-Open termial and run the following script to install all the required packages under a conda environment named `qsai`:
+Open termial and run the following script to install all the required packages:
 
 ```bash
-sh qsai_install.sh
+sh installer.sh
 ```
 
-Open `command.sh` file to change the CONDA_BASE_DIR location based on your system.
+This command takes two arguments. The following command will create conda environment.
 
 ```bash
-CONDA_BASE_DIR=Place your conda location here.
+sh installer.sh prep
 ```
 
-Execute the following command form terminal to start the GUI.
+The following command will launch the P2MAT GUI.
 
 ```bash
-sh command.sh
+sh installer.sh run
+```
+
+If you want to run both operations then using the following command. It will create the conda environment and then launch the app:
+
+```bash
+sh installer.sh both
 ```
 
 ## Usage

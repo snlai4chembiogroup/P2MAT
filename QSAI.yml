@@ -1,6 +1,6 @@
 name: qsai
 channels:
-  - apple
+  - default
   - conda-forge
 dependencies:
     - python=3.12.*
