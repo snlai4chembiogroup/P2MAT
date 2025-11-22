@@ -34,7 +34,7 @@ class SMILE:
 
         return retV
 
-    def isAromatic(smile):
+    def isAeromatic(self, smile):
         aeromatic = False
         if self.__checkValidity__(smile):
             m = Chem.MolFromSmiles(smile)
