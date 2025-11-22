@@ -23,7 +23,7 @@ P2MAT is a GUI that enable user to input SMILEs strings of chemical compounds to
 
 ## Set up
 
-Note that for MacOS this software can be installed directly using the .dmg file provided with this release. For this `Xcode` and, `java runtime environment` is required. Follow the steps below for the alternative method.
+Note that for MacOS this software can be installed directly using the `P2MAT.dmg` file provided with this release. For this `Xcode` and, `java runtime environment` is required. Follow the steps below for the alternative method.
 
 ### Environment
 
