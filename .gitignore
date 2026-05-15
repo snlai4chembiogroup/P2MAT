@@ -42,3 +42,7 @@ venv/
 
 # ─── Logs ─────────────────────────────────────────────────────────────────────
 *.log
+
+# ─── Old non-domain-split model files (superseded by _cho/_chon/_full versions) ─
+P2MAT/include/best_models/BP/bestmodel_stack.sav
+P2MAT/include/best_models/MP/bestmodel_stack.sav
