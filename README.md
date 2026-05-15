@@ -11,7 +11,7 @@
 ## Repository Layout
 
 ```
-Software/
+P2MAT/
 ├── ModelTrain/                  # ML model training pipelines
 │   ├── Boiling point/           # Boiling point model
 │   │   └── Data/                # CSVs — large files split for GitHub; run merge_data.py to restore
@@ -85,24 +85,6 @@ The **desktop GUI application** built with PyQt5. Users enter SMILES strings, se
 | `design/` | UI stylesheet (`myapp.css`), background images, and design assets |
 | `logo/` | Application logo (`logo.png`, `logo.icns`) |
 
----
-
-## bundle_stack.py / bundle_stack_bp.py
-
-These two scripts are run **once after training** to package the trained ensemble pipelines into self-contained artifacts that the P2MAT app can load without any dependency on the training codebase.
-
-| Script | Property | Output |
-|---|---|---|
-| `bundle_stack.py` | Melting point | `P2MAT/include/best_models/MP/bestmodel_stack_{cho,chon,full}.sav` |
-| `bundle_stack_bp.py` | Boiling point | `P2MAT/include/best_models/BP/bestmodel_stack_{cho,chon,full}.sav` |
-
-Run from the `Software/` directory using the `qsar` conda environment:
-
-```bash
-conda activate qsar
-python bundle_stack_bp.py
-python bundle_stack.py
-```
 
 ---
 
