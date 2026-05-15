@@ -1,84 +1,119 @@
-# P2MAT - A python based user interface to predict melting point and boiling point of chemical compounds.
+<div align="center">
+  <img src="P2MAT/logo/logo.png" alt="P2MAT Logo" width="180"/>
+  <h1>P2MAT — Material Property Prediction</h1>
+  <p>
+    A QSAR-based desktop application for predicting thermophysical properties of chemical compounds directly from their SMILES representation, powered by stacking ensemble models (LightGBM · XGBoost · ExtraTrees · DNN).
+  </p>
+</div>
 
 ---
 
-P2MAT is a GUI that enable user to input SMILEs strings of chemical compounds to predict melting point and boiling point. A pretrained machine learming model is used for the prediction. The core UI is built using [PyQt5](https://pypi.org/project/PyQt5/).
+## Repository Layout
+
+```
+Software/
+├── ModelTrain/                  # ML model training pipelines
+│   ├── Boiling point/           # Boiling point model
+│   │   └── Data/                # CSVs — large files split for GitHub; run merge_data.py to restore
+│   ├── Melting point 2D/        # Melting point model (2-D descriptors)
+│   │   └── Data/                # CSVs — large files split for GitHub; run merge_data.py to restore
+│   └── Melting point 3D/        # Melting point model (3-D descriptors)
+│       └── Data/                # CSVs — large files split for GitHub; run merge_data.py to restore
+├── P2MAT/                       # Desktop GUI application
+│   ├── utils/                   # Prediction, descriptor & helper modules
+│   ├── include/                 # Bundled model artifacts & feature lists
+│   ├── design/                  # UI assets (CSS, backgrounds, SVGs)
+│   └── logo/                    # Application icons
+├── Release/                     # Cross-platform packaging scripts
+├── bundle_stack.py              # Bundles trained MP models → include/
+└── bundle_stack_bp.py           # Bundles trained BP models → include/
+```
 
 ---
 
-**Table of Contents**
+## ModelTrain/
 
-- [P2MAT](#p2mat)
-  * [Set Up](#set-up)
-    + [Environment](#environment)
-      - [Conda](#conda)
-    + [SSH](#ssh)
-  * [Usage](#usage)
-    + [Examples](#examples)
-      - [Sample SMILEs](#sample-smiles)
-      - [GUI Description](#gui-description)
-  * [Limitations](#limitations)
+Contains three self-contained training pipelines, each following the same internal structure.  
+Each pipeline splits compounds into three elemental domains — **CHO**, **CHON**, and **FULL** — and trains domain-specific models independently.
+
+### `Boiling point/`
+Python scripts and datasets for training the **boiling point** prediction model.
+
+| Path | Description |
+|---|---|
+| `Data/` | Train/test CSV splits for CHO, CHON, and full compound sets |
+| `src/` | Core modules: data loader, feature selection, model definitions, trainer, stacking, evaluator, DNN |
+| `main.py` | Trains all base learners (LGBM, XGBoost, ExtraTrees, DNN) |
+| `stack.py` | Trains the stacking meta-learner on top of base learner predictions |
+| `boruta.py` | Boruta feature selection wrapper |
+| `shap_analysis.py` | SHAP feature importance analysis |
+| `williams_plot.py` | Williams plot for applicability domain assessment |
+| `uncertainty_analysis.py` | Prediction uncertainty estimation |
+| `similarity_score.py` | Tanimoto-based training set similarity scoring |
+| `outlier_detection.py` | Outlier identification in training data |
+| `retrain_cleaned.py` | Retraining on the cleaned (outlier-removed) dataset |
+| `results/` | LaTeX source and figures for the manuscript |
+
+### `Melting point 2D/`
+Python scripts and datasets for training the **melting point** prediction model using **2D molecular descriptors** (RDKit).  
+Structure mirrors `Boiling point/` with the addition of `dataset_similarity.py`, `methodology_diagram.py`, and `schematic_diagram.py` for paper figures.
+
+### `Melting point 3D/`
+Same as `Melting point 2D/` but trained using **3D conformer-based descriptors** (Mordred/RDKit 3D).  
+Useful for comparing 2D vs. 3D descriptor performance on the same melting point dataset.
 
 ---
 
-## Set up
-Note that for MacOS this software can be installed directly using the `P2MAT.dmg` file provided with this release. For this `Xcode` and, `java runtime environment` is required. Follow the steps below for the alternative method.
+## P2MAT/
 
-### Environment
-This python based software requires python >=12.3, Xcode and, java runtime environment.
+The **desktop GUI application** built with PyQt5. Users enter SMILES strings, select properties to predict, and get results in a table that can be exported to CSV.
 
-#### Conda
+| Path | Description |
+|---|---|
+| `p2mat.py` | Main application entry point — launches the GUI |
+| `utils/worker.py` | Background prediction thread (keeps UI responsive) |
+| `utils/stacking_predictor.py` | `StackingPredictor` inference class used at runtime |
+| `utils/descriptor.py` | Molecular descriptor computation |
+| `utils/mspp.py` | Descriptor preprocessing and domain routing (CHO / CHON / FULL) |
+| `utils/dnn_model.py` | DNN architecture for inference |
+| `utils/smile.py` | SMILES parsing and validation |
+| `utils/depictsmile.py` | 2D structure depiction from SMILES |
+| `utils/helper.py` | Shared utility functions |
+| `include/best_models/MP/` | Bundled stacking ensemble `.sav` files for melting point |
+| `include/best_models/BP/` | Bundled stacking ensemble `.sav` files for boiling point |
+| `include/feature/` | Selected feature name lists for each domain and property |
+| `design/` | UI stylesheet (`myapp.css`), background images, and design assets |
+| `logo/` | Application logo (`logo.png`, `logo.icns`) |
 
-A conda software requires to setup environments to run this software. Either [anaconda](https://www.anaconda.com/download) or [mini-conda](https://docs.anaconda.com/miniconda/miniconda-install/) can be installed to the system.
+---
 
-### SSH
+## bundle_stack.py / bundle_stack_bp.py
 
-Open termial and run the following script to install all the required packages:
+These two scripts are run **once after training** to package the trained ensemble pipelines into self-contained artifacts that the P2MAT app can load without any dependency on the training codebase.
+
+| Script | Property | Output |
+|---|---|---|
+| `bundle_stack.py` | Melting point | `P2MAT/include/best_models/MP/bestmodel_stack_{cho,chon,full}.sav` |
+| `bundle_stack_bp.py` | Boiling point | `P2MAT/include/best_models/BP/bestmodel_stack_{cho,chon,full}.sav` |
+
+Run from the `Software/` directory using the `qsar` conda environment:
 
 ```bash
-sh installer.sh
+conda activate qsar
+python bundle_stack_bp.py
+python bundle_stack.py
 ```
 
-This command takes two arguments. The following command will create conda environment.
+---
 
-```bash
-sh installer.sh prep
-```
+## Release/
 
-The following command will launch the P2MAT GUI.
+Cross-platform packaging scripts for distributing P2MAT to end users.
 
-```bash
-sh installer.sh run
-```
+| Platform | Files | Description |
+|---|---|---|
+| `macOS/` | `build_dmg.sh`, `install.command` | Builds a `.dmg` installer for macOS |
+| `linux/` | `build_tarball.sh`, `install.sh` | Builds a `.tar.gz` bundle for Linux |
+| `windows/` | `P2MAT.iss`, `Install-P2MAT.ps1` | Inno Setup installer for Windows |
 
-If you want to run both operations then using the following command. It will create the conda environment and then launch the app:
-
-```bash
-sh installer.sh both
-```
-
-## Usage
-
-### Examples
-The workflow of P2MAT software is shown below with an examples.
-
-#### Sample SMILEs
-The following sample SMILEs are given for testing perpose.
-
-```chem
-C1=CC=C(C=C1)OCC#CC#CCOC2=CC=CC=C2
-C1=CC=C(C=C1)C#CC#CC2=CC=CC=C2
-C1CCC(C1)(C#CC#CC2(CCCC2)O)O
-C1=CC=C(C=C1)C#CC2=CC=C(C=C2)C#CC3=CC=CC=C3
-C#CC1=CC=CC=C1
-CC1=C(C(CCC1)(C)C)C=CC(=CC=CC(=CC=CC=C(C)C=CC=C(C)C=CC2=C(CCCC2(C)C)C)C)C
-CC(=CCCC(=CC=CC(=CC=CC(=CC=CC=C(C)C=CC=C(C)C=CC=C(C)CCC=C(C)C)C)C)C)C
-CCCCCC(CC)CC1=CC(=C(C=C1C#CC2=CC(=CC(=C2)C#CC3=CC(=C(C=C3CC(CC)CCCCC)C#C)CC(CC)CCCCC)C#CC4=CC(=C(C=C4CC(CC)CCCCC)C#C)CC(CC)CCCCC)CC(CC)CCCCC)C#C
-```
-
-#### GUI Description
-
-![GUI](./design/paper_sw_viz_LV.png)
-
-## Limitations
-We tested our software on MacOS. We will test on other OS soon.
+See `Release/README.md` for platform-specific build instructions.
