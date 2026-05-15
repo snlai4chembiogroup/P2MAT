@@ -1,0 +1,280 @@
+%% implementation.tex
+%% Implementation section for the P2MAT paper.
+%% Covers: package/technical details, installation, license, and limitations.
+
+\section{Implementation}
+\label{sec:implementation}
+
+P2MAT is a cross-platform desktop application for predicting thermophysical
+properties of chemical compounds from SMILES input strings.
+The implementation is described below in terms of the third-party packages that
+underpin the software, the technical architecture connecting them, the
+installation procedures for both supported platforms, the governing license, and
+the known limitations of the current release.
+
+% ============================================================
+\subsection{Packages and Technical Details}
+\label{subsec:packages}
+
+Table~\ref{tab:packages} lists the primary third-party libraries used in P2MAT.
+The software requires Python 3.12 and is managed through a dedicated
+\texttt{conda} environment (\texttt{qsai}) defined in \texttt{QSAI.yml}.
+
+\begin{table}[htbp]
+\centering
+\caption{Key third-party packages used in P2MAT.}
+\label{tab:packages}
+\begin{tabular}{lll}
+\hline
+\textbf{Package} & \textbf{Role} & \textbf{Version channel} \\
+\hline
+PyQt5           & Desktop GUI framework               & pip \\
+RDKit           & SMILES validation and molecular manipulation & conda-forge \\
+PaDEL-Descriptor (via \texttt{padelpy}) & Molecular descriptor computation & pip \\
+scikit-learn    & ML models and joblib serialization  & conda-forge \\
+XGBoost         & Gradient-boosted tree regressor     & conda-forge \\
+LightGBM        & Gradient-boosted tree regressor     & conda-forge \\
+PyTorch         & Deep neural network (DNN) regressor & conda-forge \\
+NumPy           & Numerical array operations          & conda-forge \\
+Pandas          & Tabular data management             & conda-forge \\
+PubChemPy       & PubChem CID $\rightarrow$ SMILES retrieval & conda-forge \\
+Joblib          & Model serialization and loading     & conda-forge \\
+Java (OpenJDK)  & PaDEL-Descriptor runtime            & system \\
+PyInstaller     & Frozen binary packaging             & pip \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection*{Graphical User Interface}
+The application window is implemented with \textbf{PyQt5}.
+All blocking computation is isolated in a \texttt{QThread} subclass
+(\texttt{PredictionWorker}) so that the Qt event loop remains responsive during
+prediction.
+The worker communicates with the main thread exclusively through four typed Qt
+signals: \texttt{progress(int)}, \texttt{result(object)},
+\texttt{invalid\_smiles(list)}, and \texttt{error(str)}.
+The visible properties and the enabled state of each checkbox are loaded at
+startup from a single \texttt{config.json} file, allowing new properties to be
+toggled without recompiling or repackaging the application.
+
+\subsubsection*{Molecular Descriptor Computation}
+Molecular features are computed by \textbf{PaDEL-Descriptor}
+\cite{Yap2011}, a Java-based cheminformatics tool that generates both
+2D and 3D descriptors from SMILES strings.
+The \texttt{padelpy} Python wrapper is used to invoke PaDEL through the
+system's Java runtime, producing up to approximately 1\,240 numerical
+descriptors per molecule.
+To manage large query sets efficiently, SMILES are sent to PaDEL in batches of
+128 molecules by default.
+A divide-and-conquer fallback is applied: if a batch call fails, the batch is
+recursively halved until individual molecules are attempted, ensuring that one
+problematic structure does not prevent the rest from being processed.
+The temporary \texttt{.smi} input and \texttt{.csv} output files created by
+each PaDEL call are written to the operating-system temporary directory and
+deleted immediately after reading, regardless of success or failure.
+
+\subsubsection*{SMILES Validation}
+Input SMILES strings are validated structurally using \textbf{RDKit}
+\cite{Landrum2006} before any descriptor computation is attempted.
+\texttt{Chem.MolFromSmiles} is called for each candidate string; a
+\texttt{None} return value or an exception is treated as an invalid structure.
+Invalid SMILES are returned to the caller and displayed to the user without
+aborting prediction for the remaining molecules.
+PubChem compound IDs are also supported: the \textbf{PubChemPy} library
+retrieves the isomeric SMILES for each CID, which then passes through the same
+validation path.
+
+\subsubsection*{Property Prediction Models}
+All ML models are stored as serialized \texttt{joblib} artifacts in the
+\texttt{include/best\_models/} directory and are loaded on demand.
+The melting-point model is a stacking ensemble comprising four base learners---
+LightGBM, XGBoost, ExtraTrees, and a PyTorch deep neural network (DNN)---whose
+out-of-fold predictions are combined by a Ridge meta-learner.
+Boiling point, heat capacity, and heat of hydrogenation are predicted by
+dedicated gradient-boosting models following the same featurisation pipeline.
+H\textsubscript{2} uptake is computed rule-based by counting unsaturated
+(double and triple) bonds via RDKit and converting all such bonds to single
+bonds, yielding the number of moles of H\textsubscript{2} needed to
+fully saturate the molecule; no ML model is involved.
+
+\subsubsection*{Path Resolution and Packaging}
+Resource paths (models, feature lists, CSS, images) are resolved through a
+\texttt{helper.resource\_path} utility that detects at runtime whether the
+application is running as a normal Python script or as a PyInstaller-frozen
+binary (\texttt{sys.\_MEIPASS}), ensuring consistent asset access in both
+deployment modes.
+
+% ============================================================
+\subsection{Installation}
+\label{subsec:installation}
+
+P2MAT is distributed as a platform-specific installer that automates all
+prerequisite setup across three supported platforms.
+Table~\ref{tab:install} summarises the installer, distribution format,
+install location, and approximate disk footprint for each platform.
+Step-by-step installation instructions for all platforms are provided in the
+\texttt{README.md} file included with the software distribution.
+
+\begin{table}[htbp]
+\centering
+\caption{P2MAT installation summary across supported platforms.}
+\label{tab:install}
+\begin{tabular}{p{3.2cm} p{3.8cm} p{4.2cm} p{1.2cm}}
+\hline
+\textbf{Platform} & \textbf{Installer} & \textbf{Install location} & \textbf{Disk} \\
+\hline
+macOS (Apple Silicon) & \texttt{install.command} (bash) & \texttt{\textasciitilde/Applications/P2MAT/} & $\sim$3.5\,GB \\
+Windows (x64) & \texttt{Install-P2MAT.ps1} (PowerShell) & \texttt{\%LOCALAPPDATA\%\textbackslash P2MAT\textbackslash} & $\sim$4\,GB \\
+Linux (x86\_64 / aarch64) & \texttt{install.sh} (bash) & \texttt{\textasciitilde/.local/share/P2MAT/} & $\sim$4\,GB \\
+\hline
+\end{tabular}
+\end{table}
+
+All three installers follow the same six-stage sequence: (1) system and
+architecture check, (2) Java installation, (3) Miniconda3 installation,
+(4) \texttt{qsai} conda environment creation from \texttt{QSAI.yml},
+(5) application file copy, and (6) launcher or shortcut creation.
+An active internet connection is required for the first install only;
+subsequent launches are fully offline.
+The macOS installer additionally requires \textbf{Homebrew} as the system
+package manager, whereas the Linux installer auto-detects the distribution
+from \texttt{/etc/os-release} and selects the appropriate package manager
+(\texttt{apt}, \texttt{dnf}, \texttt{zypper}, or \texttt{pacman}) to install
+OpenJDK\,17.
+On Windows, Java is obtained via \texttt{winget} or a direct MSI download
+if \texttt{winget} is unavailable.
+An optional Inno Setup wizard installer
+(\texttt{P2MAT-v1.0.0-Windows-x64-Setup.exe}) is also provided for Windows
+users who prefer a guided graphical setup experience.
+For advanced users who already have \texttt{conda} and Java installed, the
+application can be launched directly from the repository without running the
+platform installer:
+
+\begin{verbatim}
+conda env create -f QSAI.yml
+conda activate qsai
+cd P2MAT && python p2mat.py
+\end{verbatim}
+
+% ============================================================
+\subsection{License}
+\label{subsec:license}
+
+P2MAT is released under the \textbf{BSD 3-Clause License}.
+
+\begin{quote}
+Copyright \textcopyright{} 2025, National Technology \& Engineering Solutions
+of Sandia, LLC (NTESS).
+Under the terms of Contract DE-NA0003525 with NTESS, the U.S.\ Government
+retains certain rights in this software.
+\end{quote}
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following three conditions are
+met:
+(1) redistributions of source code must retain the above copyright notice, this
+list of conditions, and the following disclaimer;
+(2) redistributions in binary form must reproduce the above copyright notice,
+this list of conditions, and the following disclaimer in the accompanying
+documentation; and
+(3) neither the name of NTESS nor the names of contributors may be used to
+endorse or promote products derived from this software without explicit prior
+written permission.
+
+The software is provided \emph{as is}, without any express or implied warranty
+of merchantability or fitness for a particular purpose.
+The BSD 3-Clause License is a permissive open-source license that places
+minimal restrictions on reuse while protecting the name of the originating
+institution.
+A copy of the full license text is included in the \texttt{LICENSE} file in
+the root of the P2MAT distribution.
+
+% ============================================================
+\subsection{Limitations}
+\label{subsec:limitations}
+
+The current release of P2MAT has the following known technical and usability
+limitations.
+
+\subsubsection*{Technical Limitations}
+\begin{itemize}
+  \item \textbf{Platform support.}
+        The macOS distribution is compiled and tested exclusively on
+        Apple Silicon (M-series) hardware.
+        An Intel Mac build is not provided because the melting-point DNN was
+        trained using PyTorch's Metal Performance Shaders (MPS) backend; running
+        the same artifact on an x86 CPU requires retraining on that hardware.
+        Linux is not currently supported as a deployment target.
+
+  \item \textbf{Java dependency.}
+        PaDEL-Descriptor requires a Java runtime (OpenJDK 11 or later).
+        If Java is absent or not on the system \texttt{PATH}, descriptor
+        computation will fail with a timeout or subprocess error.
+        The provided installers handle this automatically; manual installations
+        must ensure Java is correctly configured.
+
+  \item \textbf{PaDEL timeout and complex molecules.}
+        Each molecule is subject to a per-molecule timeout of 10 seconds within
+        PaDEL.
+        Very large, heavily branched, or structurally unusual molecules may
+        exhaust this budget, causing them to be silently skipped after the
+        divide-and-conquer fallback is exhausted.
+        Processing such molecules individually, or increasing the timeout
+        constant in \texttt{utils/descriptor.py}, may mitigate this issue.
+
+  \item \textbf{Applicability domain.}
+        All ML models (melting point, boiling point, heat capacity, heat of
+        hydrogenation) were trained on finite curated datasets of predominantly
+        organic molecules.
+        Predictions for structures that lie outside the chemical space covered
+        by the training data---such as inorganic salts, organometallics, or
+        highly unusual functional groups---may be unreliable.
+        No applicability-domain filter is currently applied automatically,
+        so it is the user's responsibility to interpret results for atypical
+        inputs with caution.
+
+  \item \textbf{Internet requirement.}
+        An active internet connection is required during the initial
+        installation to download Miniconda, package dependencies, and OpenJDK.
+        Offline installation is not supported.
+        PubChem CID lookup (\texttt{prediction\_from\_pid}) also requires
+        network access at prediction time.
+\end{itemize}
+
+\subsubsection*{Usability Limitations}
+\begin{itemize}
+  \item \textbf{Input format.}
+        P2MAT accepts only SMILES strings or PubChem compound IDs as input.
+        Other common molecular representations (InChI, MOL/SDF files, CAS
+        registry numbers) are not natively supported and must be converted to
+        SMILES externally before use.
+
+  \item \textbf{Sequential per-molecule processing.}
+        Molecules are processed one at a time in the background worker.
+        Although the UI remains responsive, the total wall-clock time scales
+        linearly with the number of input molecules because descriptor
+        computation involves launching the Java-based PaDEL subprocess for each
+        SMILES independently (after internal batching).
+        Large batches of hundreds of molecules may require several minutes.
+
+  \item \textbf{Single-session results.}
+        Prediction results are held in memory for the duration of the session.
+        There is no built-in history or session persistence; results that are
+        not exported to CSV before the window is closed are lost.
+
+  \item \textbf{H\textsubscript{2} uptake model scope.}
+        The H\textsubscript{2} uptake feature is a rule-based estimate based
+        solely on unsaturation count (double and triple bonds) and does not
+        account for steric accessibility, partial hydrogenation, or
+        thermodynamic feasibility.
+        It should be treated as a stoichiometric upper bound rather than a
+        kinetic or thermodynamic prediction.
+
+  \item \textbf{Minimum one property constraint.}
+        The GUI enforces that at least one property checkbox remains checked at
+        all times.
+        If all checkboxes are unchecked, melting point is automatically
+        re-enabled as a fallback.
+        This prevents zero-property prediction runs but may be unexpected for
+        users who intend only to validate SMILES input without running a model.
+\end{itemize}
